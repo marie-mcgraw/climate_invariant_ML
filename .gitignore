@@ -1,0 +1,17 @@
+# Model output and figures
+*.pickle
+*.csv
+*.png
+*.pdf
+
+#Checkpoints
+checkpoints/
+Figures/
+DATA/
+# pycache and jupyter notebook chceckpoints
+__pycache__/
+.ipynb_checkpoints
+.pyc
+
+#output files
+*.out
