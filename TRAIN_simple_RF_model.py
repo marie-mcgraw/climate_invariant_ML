@@ -56,7 +56,11 @@ warnings.simplefilter(action="ignore",category=ConvergenceWarning)
 # In[4]:
 
 
-SHIPS_load = pd.read_csv('DATA/SHIPS_processed_ALL_BASINS_I_scaled_landmask_INTERP.csv')
+interp_str = 'INTERP'
+outflow_str = 'outflow_avg'
+fname_save = 'DATA/SHIPS_processed_ALL_BASINS_I_scaled_landmask_{interp_str}_{outflow_str}.csv'.format(interp_str=interp_str,
+                                                                                    outflow_str=outflow_str)
+SHIPS_load = pd.read_csv(fname_save)
 SHIPS_load.columns
 
 
@@ -65,7 +69,7 @@ SHIPS_load.columns
 
 predictand = 'VMAX'
 predictand2 = 'I_scaled'
-predictand3 = 'I_scaled orig'
+predictand3 = 'I_scaled k'
 
 
 # Replace missing values and combine `RSST`/`NSST` and `NOHC`/`RHCN` into one variable
@@ -97,7 +101,8 @@ SHIPS_train['Year'] = pd.to_datetime(SHIPS_train['DATE_full']).dt.year
 index_columns = ['Year','BASIN','ATCF ID','CASE','TIME','NAME','DATE_full']
 predictors_sel = ['DTL','LAT','SHRG','D200','Z850','RHMD','DELV -12','SST','OHC']
 SHIPS_save = SHIPS_train.reset_index().set_index(index_columns)[predictors_sel]
-SHIPS_save[['VMAX','I_scaled']] = SHIPS_train.reset_index().set_index(index_columns)[['I_scaled','VMAX']]
+SHIPS_save[['VMAX','I_scaled','I_scaled k']] = SHIPS_train.reset_index().set_index(index_columns)[['I_scaled',
+                                                                                    'I_scaled k','VMAX']]
 SHIPS_save = SHIPS_save.reset_index()
 SHIPS_save.to_csv('CI_full_datat_save.csv')
 
@@ -153,7 +158,7 @@ def create_RF_regress(basin_train,basin_test,max_depth,score,max_features,n_esti
 
 # Randomly select years for validation
 
-# In[30]:
+# In[10]:
 
 
 SHIPS_test = SHIPS_train[SHIPS_train['Year']>=2018]
@@ -180,7 +185,7 @@ for i in np.arange(0,N_samples):
     X_test = SHIPS_train.reset_index().set_index(index_columns).loc[test_sel]
     X_test_sel = X_test[predictors_sel]
     #
-    pred_q = ['I_scaled','VMAX']
+    pred_q = ['I_scaled k','VMAX']
     #
     y_train = SHIPS_train.reset_index().set_index(index_columns).loc[train_sel]
     y_train_sel = y_train[pred_q]
@@ -199,7 +204,7 @@ for i in np.arange(0,N_samples):
         for i_basin_2 in basin_all:
             print('training on ',i_basin_1,', testing on ',i_basin_2)
             y_pred,y_test,rsq,mse = create_RF_regress(i_basin_1,i_basin_2,max_depth,score,max_features,n_estimators,min_samples_leaf,n_splits,
-                         X_train_use,y_train_use['I_scaled'],X_test_use,y_test_use['I_scaled'])
+                         X_train_use,y_train_use['I_scaled k'],X_test_use,y_test_use['I_scaled k'])
             i_rf_stats = pd.DataFrame(columns={'training basin','valid basin','MSE (I_scaled)','R^2  (I_scaled)',
                                       'MSE (I)','R^2 (I)','sample','validation yrs'},index=np.arange(0,1))
             i_rf_stats['training basin'] = i_basin_1
@@ -232,17 +237,49 @@ for i in np.arange(0,N_samples):
 # In[ ]:
 
 
-fname_save_res = 'RF_model_ypred_{N}_samples_basin_gen_training_data_save.csv'.format(N=N_samples)
+fname_save_res = 'RF_model_ypred_{N}_samples_basin_gen_training_data_save_K-based_I.csv'.format(N=N_samples)
 rf_res.to_csv(fname_save_res)
-fname_save_stats = 'RF_model_STATS_{N}_samples_basin_gen_training_data_save.csv'.format(N=N_samples)
+fname_save_stats = 'RF_model_STATS_{N}_samples_basin_gen_training_data_save_K-based_I.csv'.format(N=N_samples)
 rf_stats.to_csv(fname_save_stats)
+
+
+# In[11]:
+
+
+y_test.plot()
+plt.plot(y_pred)
 
 
 # In[ ]:
 
 
-y_test.plot()
-plt.plot(y_pred)
+N_samples = 15
+RF_res = pd.read_csv('RF_model_ypred_{N}_samples_basin_gen_training_data_save_K-based_I.csv'.format(N=N_samples))
+RF_stats = pd.read_csv('RF_model_STATS_{N}_samples_basin_gen_training_data_save_K-based_I.csv'.format(N=N_samples))
+
+
+# In[13]:
+
+
+RF_stats = rf_stats
+fig1,ax1 = plt.subplots(1,1,figsize=(12,7))
+plt1 = sns.stripplot(data=RF_stats,x='training basin',y='R^2 (I)',hue='valid basin',dodge=True,s=10,
+           palette='twilight')
+plt2 = sns.stripplot(data=RF_stats,x='training basin',y='R^2 (I_scaled)',hue='valid basin',dodge=True,s=15,marker='D',
+              palette='twilight',alpha=0.5)
+ax1.set_xlabel('Basin, training data',fontsize=20)
+ax1.tick_params(axis='both',labelsize=16)
+ax1.set_ylabel('R^2',fontsize=20)
+ax1.grid()
+handles, labels = plt2.get_legend_handles_labels()
+l = plt.legend(handles[0:4], labels[0:4], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,fontsize=15)
+ax1.set_title('$R^2$ Values During Model Training, 2005-2017',fontsize=30)
+
+
+# In[ ]:
+
+
+RF_stats
 
 
 # In[ ]:
